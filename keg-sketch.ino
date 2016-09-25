@@ -1,42 +1,38 @@
-/**********************************************************
-This is example code for using the Adafruit liquid flow meters. 
-Tested and works great with the Adafruit plastic and brass meters
-    ------> http://www.adafruit.com/products/828
-    ------> http://www.adafruit.com/products/833
-Connect the red wire to +5V, 
-the black wire to common ground 
-and the yellow sensor wire to pin #7
-Adafruit invests time and resources providing this open source code, 
-please support Adafruit and open-source hardware by purchasing 
-products from Adafruit!
-Written by Limor Fried/Ladyada  for Adafruit Industries.  
-BSD license, check license.txt for more information
-All text above must be included in any redistribution
-**********************************************************/
+// which pin to use for reading the sensor?
+#define FLOWSENSORPIN 7
+
+//how big is the keg? currently using quarter barrel.
+#define KEGSIZE 29.33
+
+//how many recent temp readings do we want to store?
+#define TEMPCOUNT 10000
+
+
 #include "LiquidCrystal.h"
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 
-// which pin to use for reading the sensor? can use any pin!
-#define FLOWSENSORPIN 7
-#define KEGSIZE 1.5//29.33
 
-// count how many pulses!
+//FLOW METER
+
+
+//count how many pulses from flow meter
 volatile uint16_t pulses = 0;
-// track the state of the pulse pin
+//track the state of the pulse pin
 volatile uint8_t lastflowpinstate;
-// you can try to keep time of how long it is between pulses
+//keep time of how long it is between pulses
 volatile uint32_t lastflowratetimer = 0;
 // and use that to calculate a flow rate
 volatile float flowrate;
-// Interrupt is called once a millisecond, looks for any pulses from the sensor!
+
+// Interrupt is called once a millisecond, looks for any pulses from the sensor.
 SIGNAL(TIMER0_COMPA_vect) {
   uint8_t x = digitalRead(FLOWSENSORPIN);
-  
+
   if (x == lastflowpinstate) {
     lastflowratetimer++;
     return; // nothing changed!
   }
-  
+
   if (x == HIGH) {
     //low to high transition!
     pulses++;
@@ -59,17 +55,20 @@ void useInterrupt(boolean v) {
   }
 }
 
+
+//THERMOMETER
+
+
 //thermometer vars
 int sensorPin = 0;
 int tempC, tempF;
-
 
 
 void setup() {
    Serial.begin(9600);
    Serial.print("Flow sensor test!");
    lcd.begin(16, 2);
-   
+
    pinMode(FLOWSENSORPIN, INPUT);
    digitalWrite(FLOWSENSORPIN, HIGH);
    lastflowpinstate = digitalRead(FLOWSENSORPIN);
@@ -77,16 +76,18 @@ void setup() {
 
 }
 
-void loop()                     // run over and over again
-{ 
+//Constantly run flow meter and thermometer; output results to LCD display.
+
+void loop()
+{
 //get temperature
-  tempC = get_temperature(sensorPin);
+  tempC = averageTemperature(sensorPin);
   tempF = celsius_to_fahrenheit(tempC);
   lcd.setCursor(0,0);
-  lcd.print("Spotted Cow");
+  lcd.print("Miller Lite");
   Serial.print("Freq: "); Serial.println(flowrate);
   Serial.print("Pulses: "); Serial.println(pulses, DEC);
-  
+
   // if a plastic sensor use the following calculation
   // Sensor Frequency (Hz) = 7.5 * Q (Liters/min)
   // Liters = Q * time elapsed (seconds) / 60 (seconds/minute)
@@ -105,12 +106,12 @@ void loop()                     // run over and over again
 
   }
   int beerLeftPercentage = (int) beerLeft;
-  lcd.print(beerLeftPercentage); lcd.print("% LEFT"); 
+  lcd.print(beerLeftPercentage); lcd.print("% LEFT");
   if (beerLeftPercentage < 1) {
     lcd.print(bummer);
   }
   lcd.print("   "); lcd.print(tempF); lcd.print((char)223); lcd.print("F    ");
-  delay(500);
+  delay(1500);
 }
 
 
@@ -130,3 +131,11 @@ int celsius_to_fahrenheit(int temp) {
   return (temp * 9 / 5) + 32;
 }
 
+int averageTemperature(int pin) {
+  float tempAggregate = 0;
+  for (int i = 0; i < TEMPCOUNT; i++) {
+    tempAggregate += get_temperature(pin);
+  }
+  float tempAverage = (tempAggregate / TEMPCOUNT);
+  return tempAverage;
+}
